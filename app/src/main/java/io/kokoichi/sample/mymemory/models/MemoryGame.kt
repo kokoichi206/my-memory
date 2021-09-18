@@ -2,7 +2,7 @@ package io.kokoichi.sample.mymemory.models
 
 import io.kokoichi.sample.mymemory.utils.DEFAULT_ICONS
 
-class MemoryGame(private val boardSize: BoardSize) {
+class MemoryGame(private val boardSize: BoardSize, private var customImages: List<String>?) {
 
     val cards: List<MemoryCard>
     var numPairsFound = 0
@@ -11,10 +11,15 @@ class MemoryGame(private val boardSize: BoardSize) {
     private var indexOfSingleSelectedCard: Int? = null
 
     init {
-        // ランダムで必要なペアの数選んだあと、そのペアを生成し、シャッフル
-        val chosenImages = DEFAULT_ICONS.shuffled().take(boardSize.getNumPairs())
-        val randomizedImages = (chosenImages + chosenImages).shuffled()
-        cards = randomizedImages.map { MemoryCard(it) }   // ??
+        if (customImages == null) {
+            // ランダムで必要なペアの数選んだあと、そのペアを生成し、シャッフル
+            val chosenImages = DEFAULT_ICONS.shuffled().take(boardSize.getNumPairs())
+            val randomizedImages = (chosenImages + chosenImages).shuffled()
+            cards = randomizedImages.map { MemoryCard(it) }   // ??
+        } else {
+            val randomizedImages = (customImages!! + customImages!!).shuffled()
+            cards = randomizedImages.map { MemoryCard(it.hashCode(), it) }
+        }
     }
 
     // ゲームロジック

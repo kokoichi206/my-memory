@@ -1,6 +1,7 @@
 package io.kokoichi.sample.mymemory
 
 import android.animation.ArgbEvaluator
+import android.app.Activity
 import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -12,17 +13,18 @@ import android.view.View
 import android.widget.RadioGroup
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
-import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.snackbar.Snackbar
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 import io.kokoichi.sample.mymemory.models.BoardSize
-import io.kokoichi.sample.mymemory.models.MemoryCard
 import io.kokoichi.sample.mymemory.models.MemoryGame
-import io.kokoichi.sample.mymemory.utils.DEFAULT_ICONS
+import io.kokoichi.sample.mymemory.models.UserImageList
 import io.kokoichi.sample.mymemory.utils.EXTRA_BOARD_SIZE
+import io.kokoichi.sample.mymemory.utils.EXTRA_GAME_NAME
 
 class MainActivity : AppCompatActivity() {
 
@@ -35,6 +37,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rvBoard: RecyclerView
     private lateinit var tvNumMoves: TextView
     private lateinit var tvNumPairs: TextView
+
+    private val db = Firebase.firestore
+    private var gameName: String? = null
+    private var customGameImages: List<String>? = null
 
     private lateinit var memoryGame: MemoryGame
     private lateinit var adapter: MemoryBoardAdapter
@@ -88,6 +94,42 @@ class MainActivity : AppCompatActivity() {
         return super.onOptionsItemSelected(item)
     }
 
+    /**
+     * オリジナルゲームを作るためのインテントから帰ってきた時の挙動
+     */
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == CREATE_REQUEST_CODE && resultCode == Activity.RESULT_OK) {
+            val customGameName = data?.getStringExtra(EXTRA_GAME_NAME)
+            if (customGameName == null) {
+                Log.e(TAG, "Got Null custom game from Create Activity")
+                return
+            }
+            downloadGame(customGameName)
+        }
+        super.onActivityResult(requestCode, resultCode, data)
+    }
+
+    private fun downloadGame(customGameName: String) {
+        db.collection("games").document(customGameName).get().addOnSuccessListener { document ->
+            val userImageList = document.toObject(UserImageList::class.java)
+            if (userImageList?.images == null) {
+                Log.e(TAG, "Invalid custom game data from Firestore")
+                Snackbar.make(clRoot, "Sorry, we couldn't find any such game, '$customGameName'", Snackbar.LENGTH_LONG).show()
+                return@addOnSuccessListener
+            }
+            val numCards = userImageList.images.size * 2
+            boardSize = BoardSize.getByValue(numCards)
+            customGameImages = userImageList.images
+            setupBoard()
+            gameName = customGameName
+        }.addOnFailureListener { exception ->
+            Log.e(TAG, "Exception when retrieving game", exception)
+        }
+    }
+
+    /**
+     * オリジナルゲームを作るためのインテント
+     */
     private fun showCreationDialog() {
         val boardSizeView = LayoutInflater.from(this).inflate(R.layout.dialog_board_size, null)
         val radioGroupSize = boardSizeView.findViewById<RadioGroup>(R.id.radioGroup)
@@ -121,6 +163,9 @@ class MainActivity : AppCompatActivity() {
                 R.id.rbMedium -> BoardSize.MEDIUM
                 else -> BoardSize.HARD
             }
+            // サイズが変わった時は、今までのキャッシュを消す
+            gameName = null
+            customGameImages = null
             setupBoard()
         })
     }
@@ -136,6 +181,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupBoard() {
+        // Change the title
+        supportActionBar?.title = gameName ?: getString(R.string.app_name)
         when (boardSize) {
             // 初期セットアップ時のみ、以下の文言に変更
             BoardSize.EASY -> {
@@ -153,7 +200,7 @@ class MainActivity : AppCompatActivity() {
         }
         // Pairs の色を初期カラー（あか）にする
         tvNumPairs.setTextColor(ContextCompat.getColor(this, R.color.color_progress_none))
-        memoryGame = MemoryGame(boardSize)
+        memoryGame = MemoryGame(boardSize, customGameImages)
 
         adapter = MemoryBoardAdapter(this, boardSize, memoryGame.cards, object: MemoryBoardAdapter.CardClickListener {
             override fun onCardClicked(position: Int) {

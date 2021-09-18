@@ -5,6 +5,13 @@ enum class BoardSize(val numCards: Int) {
     MEDIUM(18),
     HARD(24);
 
+    /**
+     * 枚数を与えた時に、それがどの難しさに対応するかを返す
+     */
+    companion object {
+        fun getByValue(value: Int) = values().first { it.numCards == value }
+    }
+
     fun getWidth(): Int {
         return when (this) {
             EASY -> 2
