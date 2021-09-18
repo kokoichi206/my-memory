@@ -62,7 +62,7 @@ class MemoryBoardAdapter(
             // ボタンにアイコン・写真を描画する
             if (memoryCard.isFaceUp) {
                 if (memoryCard.imageUrl != null) {
-                    Picasso.get().load(memoryCard.imageUrl).into(imageButton)
+                    Picasso.get().load(memoryCard.imageUrl).placeholder(R.drawable.ic_image).into(imageButton)
                 } else {
                     imageButton.setImageResource(memoryCard.identifier)
                 }
